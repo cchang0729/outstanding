@@ -1,8 +1,43 @@
+import MySQLdb
 import math
 import numpy as np
 import numpy.linalg as ln
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+
+def rssiToDistance(rssi):
+    return math.pow(10, (-59-rssi)/20)
+
+def initDatabase():
+    db=MySQLdb.connect(host="localhost",port=3306,user="root",passwd="root",db="outstanding")
+    db.query("set character_set_connection=utf8;")
+    db.query("set character_set_server=utf8;")
+    db.query("set character_set_client=utf8;")
+    db.query("set character_set_results=utf8;")
+    db.query("set character_set_database=utf8;")
+    return db
+
+#dList[0] : 50~51
+#dList[1] : 10~51
+#dList[2] : 10~50
+def initArtikPosition(c1, c2, c3, dList):
+    cursor = db.cursor()
+    c1.center = np.array([0, 0, 0])
+    c2.center = np.array([dList[2], 0, 0])
+    c3.center = np.array([0, 0, 0])
+    c3.center[0] = (d[1]**2 + d[2]**2 - d[0]**2) / 2 / d[1]
+    c3.center[1] = math.sqrt(d[1]**2 - c3.center[0]**2 )
+
+
+def initArtikRadius(c1, c2, c3, db, dev_uuid):
+    cursor = db.cursor()
+    cursor.execute("SELECT distance from distance WHERE artik_type='%s' and beacon_uuid='%s'"%('ARTIK-10', dev_uuid))
+    c1.radius = rssiToDistance(cursor.fetchone()[0])    #distance between device and artik 10
+    cursor.execute("SELECT distance from distance WHERE artik_type='%s' and beacon_uuid='%s'"%('ARTIK-50', dev_uuid))
+    c2.radius = rssiToDistance(cursor.fetchone()[0])    #distance between device and artik 50
+    cursor.execute("SELECT distance from distance WHERE artik_type='%s' and beacon_uuid='%s'"%('ARTIK-51', dev_uuid))
+    c3.radius = rssiToDistance(cursor.fetchone()[0])    #distance between device and artik 51
+
 
 """Define Sphere(Circle) class. radius(double) & center(np.array)"""
 class Circle:
@@ -62,17 +97,16 @@ def sphereSurface( c ):
 
 if __name__ == '__main__':
    #create sphere
-   c1 = Circle(1, np.array([3, 0, 0]))
-   c2 = Circle(1, np.array([0,3, 0]))
-   c3 = Circle(1, np.array([-3, 0, 0]))
-   c1.radius = 4.0
-   c2.radius = 3.0
-   c3.radius = 3.0
-   c1.center[2] = 0
-   c2.center[2] = 0
-   c3.center[2] = 0
+   c1 = Circle()
+   c2 = Circle()
+   c3 = Circle()
 
+   db = initDatabase()
+   cursor = db.cursor()
+   
+   initArtikPosition(c1, c2, c3, db)
    #Solve
+   
    bp = solveTrilateration(c1, c2, c3)
 
    #Plot
